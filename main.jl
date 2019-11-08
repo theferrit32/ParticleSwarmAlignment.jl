@@ -32,8 +32,9 @@ for i in 1:length(sequences)
         if i != j
             seqA = sequences[i]
             seqB = sequences[j]
-            #function global_align(v,w,match_penalty=1,mismatch_penalty=-1,deletion_penalty=0)
+            # Use global_align function from needleman_wunsch to compute the distance
             distanceAB, seqA_aligned, seqB_aligned = global_align(seqA, seqB, 1, -1, 0)
+            # Add edge A-B = distanceAB
             push!(edges, (seqA, seqB, distanceAB))
         end
     end
