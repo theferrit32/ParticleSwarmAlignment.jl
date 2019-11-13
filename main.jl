@@ -142,6 +142,8 @@ function progressive_alignment_inorder(sequences::Array, edge_weights::Array)
         B = sequences[min_i+1]
         score, alignedA, alignedB = global_align(A, B)
 
+        # TODO keep cumulative alignment.
+        # need to figure out how to use alignedA and alignedB for the next step
 
     end
 end
