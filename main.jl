@@ -127,6 +127,12 @@ function pso_particle_velocity(particle, global_best::Array, local_best::Array, 
     return velocity
 end
 
+# TODO
+function apply_velocity_to_particle(particle, swap_sequence_velocity::Array)
+
+
+end
+
 function get_new_gap_indexes(old::String, new::String)::Array{Int64,1}
 
     old_local = deepcopy(old)
