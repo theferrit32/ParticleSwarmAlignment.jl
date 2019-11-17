@@ -102,7 +102,7 @@ function get_swap_sequence(A::Array, B::Array)
             temp = localA[i]
             localA[i] = localA[b_index]
             localA[b_index] = temp
-            
+
             push!(swap_sequence, (i, b_index))
         end
     end
@@ -127,25 +127,157 @@ function pso_particle_velocity(particle, global_best::Array, local_best::Array, 
     return velocity
 end
 
-function progressive_alignment_inorder(sequences::Array, edge_weights::Array)
-    if length(edge_weights) != length(sequences) - 1
-        msg = @sprintf("Expected %d edge weights, got %d", length(sequences) - 1, length(edge_weights))
+function get_new_gap_indexes(old::String, new::String)::Array{Int64,1}
+
+    old_local = deepcopy(old)
+    indexes = []
+    for i in 1:length(new)
+        if (new[i] == '-' && i == (length(old_local) + 1)) || new[i] == '-' && old_local[i] != '-'
+            @printf("get_new_gap_indexes, new gap at %d, old: %s, new: %s\n", i, old_local, new)
+            push!(indexes, i)
+            old_local = string(string(old_local[1:i-1], '-'), old_local[i:end])
+        elseif new[i] == old_local[i]
+            continue
+        else
+            @printf("Sequences were not the same: %s, %s\n", old, new)
+            throw(ErrorException("Sequences ignoring gaps were not the same"))
+        end
+    end
+    return indexes
+end
+
+function insert_gaps_at(sequences::Array, seq_indexes::Array{Int64,1}, gap_indexes::Array{Int64,1})
+    gap_indexes = sort(gap_indexes)
+
+    for sidx in 1:length(seq_indexes)
+        seq_index = seq_indexes[sidx]
+        s = sequences[seq_index]
+
+        for i in gap_indexes
+            # insert a '-' character at index i
+            @printf("Inserting gap into %s at index %d\n", s, i)
+            s = string(string(s[1:i-1], '-'), s[i:end])
+            @printf("New value: %s\n", s)
+        end
+        # put the modified string back in the array
+        sequences[seq_index] = s
+    end
+end
+
+function progressive_alignment_inorder(sequences::Array, edges::Array{Tuple,1})
+    if length(edges) != length(sequences) - 1
+        msg = @sprintf("Expected %d edge weights, got %d", length(sequences) - 1, length(edges))
         throw(ErrorException(msg))
     end
-    local_edge_weights = deepcopy(edge_weights)
+    local_edges = deepcopy(edges)
     total_score = 0
-    for i in 1:length(edge_weights)
+
+    aligned_sequences = []
+    predecessors = Array{Array{Int64,1}}(undef,0) # store which sequence indexes are at or below each other sequence in the tree
+
+    sets = Array{Array{Int64,1},1}(undef,0)
+
+    for i in 1:length(sequences)
+        #seq in sequences
+        seq = sequences[i]
+        push!(aligned_sequences, deepcopy(seq))
+        push!(predecessors, [])
+
+        push!(sets, [i])
+    end
+
+
+    for i in 1:length(edges)
         # find the min edge weight that has not been used yet
-        min_i = argmin(local_edge_weights)
+        min_edge = local_edges[1]
+        min_edge_i = 1
+        for edge_i in 2:length(local_edges)
+            if local_edges[edge_i][3] < min_edge[3]
+                min_edge = local_edges[edge_i]
+                min_edge_i = edge_i
+            end
+        end
+        deleteat!(local_edges, min_edge_i)
+
+        # min_edge_weight = min(local_edge_weights...)
+        # min_edge_i = Nothing
+        # for orig_i in 1:length(edge_weights)
+        #     if edge_weights[orig_i] == min_edge_weight
+        #         min_edge_i = orig_i
+        #         break
+        #     end
+        # end
+        # edge_weight = edge_weights[min_edge_i]
+
+
+        # #delete!(local_edge_weights, min_edge_weight)
+        # deleteat!(local_edge_weights, findfirst(x -> x == min_edge_weight, local_edge_weights))
+
+        #min_i += (i - 1)
+
+        @printf("aligned_sequences: %s\n", string(aligned_sequences))
+        @printf("original edges: %s\n", string(edges))
+        @printf("local_edges: %s\n", string(local_edges))
+
         # do the alignment of min_i and (min_i + 1)
-        A = sequences[min_i]
-        B = sequences[min_i+1]
+        idxA = findfirst(s -> s == min_edge[1], sequences)
+        idxB = findfirst(s -> s == min_edge[2], sequences)
+        A = aligned_sequences[idxA]
+        B = aligned_sequences[idxB]
+        @printf("\n\nPerforming global alignment of %s and %s, edge_weight: %d\n", A, B, min_edge[3])
         score, alignedA, alignedB = global_align(A, B)
+
 
         # TODO keep cumulative alignment.
         # need to figure out how to use alignedA and alignedB for the next step
+        # TODO take new_gap_indexes_A, and insert same gaps into all current
+        # predecessors of A.  And same for B
+        new_gap_indexes_A = get_new_gap_indexes(A, alignedA)
+        @printf("new_gap_indexes_A: %s\n", string(new_gap_indexes_A))
+        @printf("predecessors A(%d): %s\n", idxA, string(sets[idxA]))
+        seqs_to_update = copy(sets[idxA])
+        deleteat!(seqs_to_update, findfirst(x -> x == idxA, seqs_to_update))
+        insert_gaps_at(aligned_sequences, seqs_to_update, new_gap_indexes_A)
+        @printf("predecessors A(%d): %s\n", idxA, string(sets[idxA]))
+
+        new_gap_indexes_B = get_new_gap_indexes(B, alignedB)
+        @printf("new_gap_indexes_B: %s\n", string(new_gap_indexes_B))
+        @printf("predecessors B(%d): %s\n", idxB, string(sets[idxB]))
+        seqs_to_update = copy(sets[idxB])
+        deleteat!(seqs_to_update, findfirst(x -> x == idxB, seqs_to_update))
+        insert_gaps_at(aligned_sequences, sets[idxB], new_gap_indexes_B)
+        @printf("predecessors B(%d): %s\n", idxB, string(sets[idxB]))
+
+        aligned_sequences[idxA] = alignedA
+        aligned_sequences[idxB] = alignedB
+
+        # Update predecessors for A and B
+        #curr_predecessors_A = deepcopy(predecessors[idxA])
+
+        # TODO avoid the loop somehow by reusing the sets array from one of the existing idxA or idxB elements
+        newset = []#[idxA, idxB]
+        push!(newset, sets[idxA]...)
+        push!(newset, sets[idxB]...)
+        @printf("newset: %s\n", string(newset))
+        sets[idxA] = newset
+        sets[idxB] = newset
+        for p in newset
+            sets[p] = newset
+        end
 
     end
+    return aligned_sequences
+end
+
+function get_edge_between(nodeA::String, nodeB::String, edges::Array)
+    for edge in edges
+        if edge[1] == nodeA && edge[2] == nodeB
+            return edge
+        elseif edge[1] == nodeB && edge[2] == nodeA
+            return edge
+        end
+    end
+    return Nothing
 end
 
 function PSO_MSA()
@@ -203,10 +335,25 @@ function PSO_MSA()
     #local_bests = zeros(Float64, length(particles))
     particle_scores = zeros(Float64, length(particles))
 
-    for iteration in 1:iterations
+    #for iteration in 1:iterations
 
+    # TODO get the edges between this particle ordering
+    # look at particles[0] to test
+    particles_1_edges = Array{Tuple,1}(undef,0)
+    for i in 2:length(particles[1])
+        edge = get_edge_between(particles[1][i-1], particles[1][i], edges)
+        push!(particles_1_edges, edge) # push the edge weight only
     end
+    @printf("Performing progressive alignment of particle 1:\n%s\nEdges: %s\n", string(particles[1]), string(particles_1_edges))
+    aligned_sequences = progressive_alignment_inorder(particles[1], particles_1_edges)
 
+    # TODO need function to find the "SCORE" of the aligned_sequences array
+
+    # in each iteration, find the maximum score (minimize distance)
+
+    for aligned_seq in aligned_sequences
+        @printf("%s (length=%d)\n", aligned_seq, length(aligned_seq))
+    end
 
 end
 
