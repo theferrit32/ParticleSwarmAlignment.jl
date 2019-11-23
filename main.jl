@@ -73,13 +73,20 @@ end
 
 # Returns a swap sequence [(idx1, idx2), ...] to turn A into B
 # Not necessarily the optimal swap sequence
-function get_swap_sequence(A::Array, B::Array)
+function get_swap_sequence(A::String, B::String)
     if length(A) != length(B)
         throw(ErrorException("Length of A and B must be the same"))
     end
 
-    localA = deepcopy(A)
-    localB = deepcopy(B)
+    localA = Array{Char,1}(undef,0)
+    localB = Array{Char,1}(undef,0)
+    for i in 1:length(A)
+        push!(localA, A[i])
+        push!(localB, B[i])
+    end
+
+    # localA = deepcopy(A)
+    # localB = deepcopy(B)
     swap_sequence = []
 
     for i in 1:length(A)
@@ -112,8 +119,8 @@ function get_swap_sequence(A::Array, B::Array)
     return swap_sequence
 end
 
-# Calculates a new "velocity" for the particle given global best score, local best score
-function pso_particle_velocity(particle, global_best::Array, local_best::Array, alpha::Float64, beta::Float64)
+# Calculates a new "velocity" for the particle given global best particle, local best particle
+function pso_particle_velocity(particle, global_best::String, local_best::String, alpha::Float64, beta::Float64)
     swaps_to_local_best = get_swap_sequence(particle, local_best)
     swaps_to_global_best = get_swap_sequence(particle, global_best)
     r = Random.rand()
@@ -127,10 +134,14 @@ function pso_particle_velocity(particle, global_best::Array, local_best::Array, 
     return velocity
 end
 
-# TODO
-function apply_velocity_to_particle(particle, swap_sequence_velocity::Array)
 
-
+function apply_velocity_to_particle(particle::String, swap_sequence_velocity::Array)::String
+    for (idxA, idxB) in swap_sequence_velocity
+        temp = particle[idxA]
+        particle[idxA] = particle[idxB]
+        particle[idxB] = temp
+    end
+    return particle
 end
 
 function get_new_gap_indexes(old::String, new::String)::Array{Int64,1}
@@ -169,6 +180,54 @@ function insert_gaps_at(sequences::Array, seq_indexes::Array{Int64,1}, gap_index
         sequences[seq_index] = s
     end
 end
+
+
+function Make_Profile(k::Int64, t::Int64, A::Array)
+    idxA = zeros(Int64, k)
+    idxC = zeros(Int64, k)
+    idxG = zeros(Int64, k)
+    idxT = zeros(Int64, k)
+    idxGap = zeros(Int64, k)
+
+    for index in range(1, length=k)
+        for seq in A
+            if seq[index] == 'A'
+                idxA[index] += 1
+            elseif seq[index] == 'C'
+                idxC[index] += 1
+            elseif seq[index] == 'G'
+                idxG[index] += 1
+            elseif seq[index] == 'T'
+                idxT[index] += 1
+            elseif seq[index] == '-'
+                idxGap[index] += 1
+            else
+                throw(DomainError(seq[index], "character not allowed in DNA sequence"))
+            end
+        end
+    end
+
+    return Dict(
+        "A" => idxA,
+        "C" => idxC,
+        "G" => idxG,
+        "T" => idxT,
+        "-" => idxGap
+    )
+end
+
+function score_sequences(A::Array)::Int64
+    k = length(A[1])
+    t = length(A)
+    profile = Make_Profile(k, t, A)
+    # score is the sum of the maximum occurring letter in each position
+    score = 0
+    for i in 1:k
+        score += max(profile["A"][i], profile["T"][i], profile["G"][i], profile["C"][i])
+    end
+    return score
+end
+
 
 function progressive_alignment_inorder(sequences::Array, edges::Array{Tuple,1})
     if length(edges) != length(sequences) - 1
@@ -283,8 +342,10 @@ function get_edge_between(nodeA::String, nodeB::String, edges::Array)
             return edge
         end
     end
-    return Nothing
+    return nothing
 end
+
+
 
 function PSO_MSA()
     N = 10
@@ -336,30 +397,138 @@ function PSO_MSA()
 
     alpha = Random.rand()
     beta = Random.rand()
-    # TODO
-    #global_best =  # calculate best permutation from the current particles
-    #local_bests = zeros(Float64, length(particles))
-    particle_scores = zeros(Float64, length(particles))
 
-    #for iteration in 1:iterations
+    particle_scores = Array{Int64,1}(undef,0)
+    for p in particles
+        score = score_sequences(p)
+        push!(particle_scores, score)
+    end
+
+
+    local_best_scores = copy(particle_scores)
+    local_best_particles = deepcopy(particles)
+    global_best_particle_idx = argmax(particle_scores)
+    global_best_particle_score = local_best_particles[global_best_particle_idx]
+
+    position_xid = copy(particles[1]) # just start from one
+
+    for iteration in 1:iterations
+        # filter list of particles to those only in same position as xid
+        filtered_indexes = []
+        for pidx in 1:length(particles)
+            if particles[pidx] == position_xid
+                push!(filtered_indexes, pidx)
+            end
+        end
+
+        if length(filtered_indexes) == 0
+            continue
+        end
+
+        new_velocity = pso_particle_velocity(position_xid, particles[global_best_particle_idx], )
+
+        # get the edges between the sequences in the position_xid TSP order
+        particle_edges = Array{Tuple,1}(undef,0)
+        for i in 2:length(position_xid)
+            edge = get_edge_between(position_xid[i-1], position_xid[i], edges)
+            push!(particle_edges, edge) # push the edge
+        end
+
+        @printf("Performing progressive alignment of particle 1:\n%s\nEdges: %s\n", string(position_xid), string(particle_edges))
+        aligned_sequences = progressive_alignment_inorder(position_xid, particle_edges)
+        score = score_sequences(aligned_sequences)
+
+        # apply the velocity to the TSP order
+        position_xid = apply_velocity_to_particle(position_xid, new_velocity)
+
+        # TODO for all filtered idxs
+        for fidx in filtered_indexes
+            if score > local_best_scores[fidx]
+                @printf("New score for %s %d is better than previous score %d\n", position_xid, score, local_best_scores[fidx])
+                local_best_scores[fidx] = score
+                local_best_particles[fidx] = position_xid
+                particles[fidx] = position_xid
+            end
+        end
+
+        if score > global_best_particle_score
+            @printf("New score for %s %d is better than previous global best %d\n",
+                    position_xid, score, global_best_particle_score)
+            global_best_particle_score = score
+            global_best_particle_idx = filtered_indexes[1]
+        end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    #     for pidx in 1:length(particles)
+    #         particle = particles[pidx]
+    #         # filter list of particles to those only in same position as xid
+    #         # it is not the the xid position, ignore it
+    #         if particle != position_xid
+    #             continue
+    #         end
+
+    #         # calculate the new velocity for the particle
+    #         new_velocity = pso_particle_velocity(particle, particles[global_best_particle_idx], )
+
+    #         apply_velocity_to_particle(position_xid, new_velocity)
+
+
+    #         particle_edges = Array{Tuple,1}(undef,0)
+    #         for i in 2:length(particle)
+    #             edge = get_edge_between(particle[i-1], particle[i], edges)
+    #             push!(particle_edges, edge) # push the edge weight only
+    #         end
+
+    #         @printf("Performing progressive alignment of particle 1:\n%s\nEdges: %s\n", string(particle), string(particle_edges))
+    #         aligned_sequences = progressive_alignment_inorder(particle, particle_edges)
+    #         score = score_sequences(aligned_sequences)
+
+    #         if score > local_best_scores[pidx]
+    #             @printf("New score for %s %d is better than previous score %d\n", particle, score, local_bests[pidx])
+    #             local_best_scores[pidx] = score
+    #             local_best_particles = particle
+    #         end
+    #         if score > global_best_particle_score
+    #             @printf("New score for %s %d is better than previous global best %d\n",
+    #                     particle, score, global_best_particle_score)
+    #             global_best_particle_score = score
+    #             global_best_particle_idx = pidx
+    #         end
+    #     end
+    # end
+
 
     # TODO get the edges between this particle ordering
     # look at particles[0] to test
-    particles_1_edges = Array{Tuple,1}(undef,0)
-    for i in 2:length(particles[1])
-        edge = get_edge_between(particles[1][i-1], particles[1][i], edges)
-        push!(particles_1_edges, edge) # push the edge weight only
-    end
-    @printf("Performing progressive alignment of particle 1:\n%s\nEdges: %s\n", string(particles[1]), string(particles_1_edges))
-    aligned_sequences = progressive_alignment_inorder(particles[1], particles_1_edges)
+    # particles_1_edges = Array{Tuple,1}(undef,0)
+    # for i in 2:length(particles[1])
+    #     edge = get_edge_between(particles[1][i-1], particles[1][i], edges)
+    #     push!(particles_1_edges, edge) # push the edge weight only
+    # end
+    # @printf("Performing progressive alignment of particle 1:\n%s\nEdges: %s\n", string(particles[1]), string(particles_1_edges))
+    # aligned_sequences = progressive_alignment_inorder(particles[1], particles_1_edges)
 
-    # TODO need function to find the "SCORE" of the aligned_sequences array
+    # # TODO need function to find the "SCORE" of the aligned_sequences array
 
-    # in each iteration, find the maximum score (minimize distance)
+    # # in each iteration, find the maximum score (minimize distance)
 
-    for aligned_seq in aligned_sequences
-        @printf("%s (length=%d)\n", aligned_seq, length(aligned_seq))
-    end
+    # for aligned_seq in aligned_sequences
+    #     @printf("%s (length=%d)\n", aligned_seq, length(aligned_seq))
+    # end
 
 end
 
