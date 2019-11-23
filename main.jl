@@ -3,6 +3,18 @@ using Printf
 include("./needleman_wunsch.jl")
 Random.seed!(1)
 
+debug = false
+
+if debug
+    function dprintf(s::String, args...)
+        @eval @printf($s, $(args...))
+    end
+else
+    function dprintf(s, args...)
+        # nothing
+    end
+end
+
 function generate_sequences(t::Int64, l::Int64)
     # t is the number of sequences to create
     # l is the length of the sequences
@@ -21,7 +33,7 @@ end
 
 
 function array_equals_ordered(A::Array, B::Array)
-    @printf("Comparing %s to %s\n", string(A), string(B))
+    dprintf("Comparing %s to %s\n", string(A), string(B))
     if length(A) != length(B)
         return false
     end
@@ -47,7 +59,7 @@ end
 function random_permutations(A::Array{String,1}, num::Int64)::Array{Array{String,1},1}
     # Return num random permutations of the elements of A
     results = Array{Array{String,1},1}(undef,0)
-    if num >= factorial(length(A))
+    if num >= factorial(big(length(A)))
         throw(ErrorException("num is too high"))
     end
     max_check = 50
@@ -90,7 +102,7 @@ function get_swap_sequence(A::Array{String,1}, B::Array{String,1})
     swap_sequence = []
 
     for i in 1:length(A)
-        @printf("Checking index %d, localA: %s\nlocalB: %s\n", i, string(localA), string(localB))
+        dprintf("Checking index %d, localA: %s\nlocalB: %s\n", i, string(localA), string(localB))
         if localA[i] != localB[i]
 
             # check where A[i] is in B[i:end]
@@ -103,7 +115,7 @@ function get_swap_sequence(A::Array{String,1}, B::Array{String,1})
             end
             b_index += i - 1
 
-            @printf("Doing swap (%d,%d)\n", i, b_index)
+            dprintf("Doing swap (%d,%d)\n", i, b_index)
             # record the swap of i and b_index
             temp = localA[i]
             localA[i] = localA[b_index]
@@ -112,9 +124,9 @@ function get_swap_sequence(A::Array{String,1}, B::Array{String,1})
             push!(swap_sequence, (i, b_index))
         end
     end
-    @printf("localA: %s\nlocalB: %s\n", string(localA), string(localB))
+    dprintf("localA: %s\nlocalB: %s\n", string(localA), string(localB))
     local_equals = array_equals_ordered(localA, localB)
-    @printf("localA == localB: %s\n", string(local_equals))
+    dprintf("localA == localB: %s\n", string(local_equals))
     return swap_sequence
 end
 
@@ -270,22 +282,22 @@ function progressive_alignment_inorder(sequences::Array, edges::Array{Tuple,1}):
         end
         deleteat!(local_edges, min_edge_i)
 
-        @printf("aligned_sequences: %s\n", string(aligned_sequences))
-        @printf("original edges: %s\n", string(edges))
+        #@printf("aligned_sequences: %s\n", string(aligned_sequences))
+        #@printf("original edges: %s\n", string(edges))
         #@printf("local_edges: %s\n", string(local_edges))
-        @printf("min_edge: %s\n", string(min_edge))
+        dprintf("min_edge: %s\n", string(min_edge))
 
         # do the alignment of min_i and (min_i + 1)
         # TODO use aligned sequences here instead of original sequences
-        @printf("Looking for %s in %s\n", min_edge[1], sequences)
+        #@printf("Looking for %s in %s\n", min_edge[1], sequences)
         idxA = findfirst(s -> sequence_equals_ignore_gaps(s, min_edge[1]), sequences)
         #idxA = findfirst(s -> s == min_edge[1], sequences)
-        @printf("Looking for %s in %s\n", min_edge[2], sequences)
+        #@printf("Looking for %s in %s\n", min_edge[2], sequences)
         idxB = findfirst(s -> sequence_equals_ignore_gaps(s, min_edge[2]), sequences)
         #idxB = findfirst(s -> s == min_edge[2], sequences)
         A = aligned_sequences[idxA]
         B = aligned_sequences[idxB]
-        @printf("\n\nPerforming global alignment of %s and %s, edge_weight: %d\n", A, B, min_edge[3])
+        dprintf("\n\nPerforming global alignment of %s and %s, edge_weight: %d\n", A, B, min_edge[3])
         score, alignedA, alignedB = global_align(A, B)
 
 
@@ -295,19 +307,19 @@ function progressive_alignment_inorder(sequences::Array, edges::Array{Tuple,1}):
         # predecessors of A.  And same for B
         new_gap_indexes_A = get_new_gap_indexes(A, alignedA)
         #@printf("new_gap_indexes_A: %s\n", string(new_gap_indexes_A))
-        @printf("predecessors A(%d): %s\n", idxA, string(sets[idxA]))
+        #@printf("predecessors A(%d): %s\n", idxA, string(sets[idxA]))
         seqs_to_update = copy(sets[idxA])
         deleteat!(seqs_to_update, findfirst(x -> x == idxA, seqs_to_update))
         insert_gaps_at(aligned_sequences, seqs_to_update, new_gap_indexes_A)
-        @printf("predecessors A(%d): %s\n", idxA, string(sets[idxA]))
+        #@printf("predecessors A(%d): %s\n", idxA, string(sets[idxA]))
 
         new_gap_indexes_B = get_new_gap_indexes(B, alignedB)
         #@printf("new_gap_indexes_B: %s\n", string(new_gap_indexes_B))
-        @printf("predecessors B(%d): %s\n", idxB, string(sets[idxB]))
+        #@printf("predecessors B(%d): %s\n", idxB, string(sets[idxB]))
         seqs_to_update = copy(sets[idxB])
         deleteat!(seqs_to_update, findfirst(x -> x == idxB, seqs_to_update))
         insert_gaps_at(aligned_sequences, sets[idxB], new_gap_indexes_B)
-        @printf("predecessors B(%d): %s\n", idxB, string(sets[idxB]))
+        #@printf("predecessors B(%d): %s\n", idxB, string(sets[idxB]))
 
         aligned_sequences[idxA] = alignedA
         aligned_sequences[idxB] = alignedB
@@ -319,7 +331,7 @@ function progressive_alignment_inorder(sequences::Array, edges::Array{Tuple,1}):
         newset = []#[idxA, idxB]
         push!(newset, sets[idxA]...)
         push!(newset, sets[idxB]...)
-        @printf("newset: %s\n", string(newset))
+        #@printf("newset: %s\n", string(newset))
         sets[idxA] = newset
         sets[idxB] = newset
         for p in newset
@@ -349,10 +361,10 @@ end
 
 
 function PSO_MSA()
-    N = 10
+    N = 100
     t = 5
     iterations = 10
-    solution_space = factorial(N) / (N*(N-1))
+    solution_space = factorial(big(N)) / (N*(N-1))
     search_space = N * iterations
     search_solution_ratio = search_space / solution_space
     @printf("Solution Space: %.02f\n", solution_space)
@@ -386,7 +398,7 @@ function PSO_MSA()
     print("Edges: ")
     println(edges)
     num_particles = 0
-    if length(edges) > 100 || factorial(length(edges)) > 100
+    if length(edges) > 100 || factorial(big(length(edges))) > 100
         num_particles = 100
     else
         num_particles = length(edges)
@@ -441,7 +453,7 @@ function PSO_MSA()
             push!(particle_edges, edge) # push the edge
         end
 
-        @printf("Performing progressive alignment of particle 1:\n%s\nEdges: %s\n", string(position_xid), string(particle_edges))
+        dprintf("Performing progressive alignment of particle 1:\n%s\nEdges: %s\n", string(position_xid), string(particle_edges))
         aligned_sequences = progressive_alignment_inorder(position_xid, particle_edges)
         score = score_sequences(aligned_sequences)
 
@@ -451,7 +463,7 @@ function PSO_MSA()
         # TODO for all filtered idxs
         for fidx in filtered_indexes
             if score > local_best_scores[fidx]
-                @printf("New score for %s %d is better than previous score %d\n", position_xid, score, local_best_scores[fidx])
+                dprintf("New score for %s %d is better than previous score %d\n", position_xid, score, local_best_scores[fidx])
                 local_best_scores[fidx] = score
                 local_best_particles[fidx] = position_xid
                 particles[fidx] = position_xid
@@ -459,7 +471,7 @@ function PSO_MSA()
         end
 
         if score > global_best_particle_score
-            @printf("New score for %s %d is better than previous global best %d\n",
+            dprintf("New score for %s %d is better than previous global best %d\n",
                     position_xid, score, global_best_particle_score)
             global_best_particle_score = score
             global_best_particle_idx = filtered_indexes[1]
@@ -469,75 +481,16 @@ function PSO_MSA()
 
 
     # print the final results
-    println("Global best:")
+    println("\nGlobal best:")
     for seq in global_best_particle_value
         println(seq)
     end
-
-
-
-
-
-    #     for pidx in 1:length(particles)
-    #         particle = particles[pidx]
-    #         # filter list of particles to those only in same position as xid
-    #         # it is not the the xid position, ignore it
-    #         if particle != position_xid
-    #             continue
-    #         end
-
-    #         # calculate the new velocity for the particle
-    #         new_velocity = pso_particle_velocity(particle, particles[global_best_particle_idx], )
-
-    #         apply_velocity_to_particle(position_xid, new_velocity)
-
-
-    #         particle_edges = Array{Tuple,1}(undef,0)
-    #         for i in 2:length(particle)
-    #             edge = get_edge_between(particle[i-1], particle[i], edges)
-    #             push!(particle_edges, edge) # push the edge weight only
-    #         end
-
-    #         @printf("Performing progressive alignment of particle 1:\n%s\nEdges: %s\n", string(particle), string(particle_edges))
-    #         aligned_sequences = progressive_alignment_inorder(particle, particle_edges)
-    #         score = score_sequences(aligned_sequences)
-
-    #         if score > local_best_scores[pidx]
-    #             @printf("New score for %s %d is better than previous score %d\n", particle, score, local_bests[pidx])
-    #             local_best_scores[pidx] = score
-    #             local_best_particles = particle
-    #         end
-    #         if score > global_best_particle_score
-    #             @printf("New score for %s %d is better than previous global best %d\n",
-    #                     particle, score, global_best_particle_score)
-    #             global_best_particle_score = score
-    #             global_best_particle_idx = pidx
-    #         end
-    #     end
-    # end
-
-
-    # TODO get the edges between this particle ordering
-    # look at particles[0] to test
-    # particles_1_edges = Array{Tuple,1}(undef,0)
-    # for i in 2:length(particles[1])
-    #     edge = get_edge_between(particles[1][i-1], particles[1][i], edges)
-    #     push!(particles_1_edges, edge) # push the edge weight only
-    # end
-    # @printf("Performing progressive alignment of particle 1:\n%s\nEdges: %s\n", string(particles[1]), string(particles_1_edges))
-    # aligned_sequences = progressive_alignment_inorder(particles[1], particles_1_edges)
-
-    # # TODO need function to find the "SCORE" of the aligned_sequences array
-
-    # # in each iteration, find the maximum score (minimize distance)
-
-    # for aligned_seq in aligned_sequences
-    #     @printf("%s (length=%d)\n", aligned_seq, length(aligned_seq))
-    # end
-
+    println()
 end
 
-PSO_MSA()
+perf = @timed PSO_MSA()
+
+println(perf)
 
 # swap_sequence = get_swap_sequence([1,2,3,4,5,6], [4,3,2,1,6,5])
 # println(swap_sequence)
