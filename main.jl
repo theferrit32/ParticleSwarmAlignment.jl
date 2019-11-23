@@ -1,5 +1,6 @@
 using Random
 using Printf
+using Dates
 include("./needleman_wunsch.jl")
 Random.seed!(1)
 
@@ -362,8 +363,8 @@ end
 
 function PSO_MSA()
     N = 100
-    t = 5
-    iterations = 10
+    t = 20
+    iterations = 20
     solution_space = factorial(big(N)) / (N*(N-1))
     search_space = N * iterations
     search_solution_ratio = search_space / solution_space
@@ -393,10 +394,10 @@ function PSO_MSA()
         end
     end
 
-    print("Nodes: ")
-    println(nodes)
-    print("Edges: ")
-    println(edges)
+    # print("Nodes: ")
+    # println(nodes)
+    # print("Edges: ")
+    # println(edges)
     num_particles = 0
     if length(edges) > 100 || factorial(big(length(edges))) > 100
         num_particles = 100
@@ -405,8 +406,8 @@ function PSO_MSA()
     end
 
     particles = random_permutations(nodes, 10)
-    println("Permutations:")
-    println(particles)
+    #println("Permutations:")
+    #println(particles)
 
     alpha = Random.rand()
     beta = Random.rand()
@@ -428,6 +429,8 @@ function PSO_MSA()
     position_xid = copy(particles[1]) # just start from one
 
     for iteration in 1:iterations
+        @printf("Beginning iteration %d\n", iteration)
+        start = Dates.now()
         # filter list of particles to those only in same position as xid
         filtered_indexes = []
         for pidx in 1:length(particles)
@@ -477,6 +480,10 @@ function PSO_MSA()
             global_best_particle_idx = filtered_indexes[1]
             global_best_particle_value = copy(position_xid)
         end
+
+        end_time = Dates.now()
+        duration = end_time - start
+        @printf("Iteration took %d milliseconds\n", duration.value)
     end
 
 
