@@ -44,9 +44,9 @@ function array_contains(A::Array, e)
     return false
 end
 
-function random_permutations(A, num::Int64)
-    # Return num random permutations of the elements of the Array A
-    results = []
+function random_permutations(A::Array{String,1}, num::Int64)::Array{Array{String,1},1}
+    # Return num random permutations of the elements of A
+    results = Array{Array{String,1},1}(undef,0)
     if num >= factorial(length(A))
         throw(ErrorException("num is too high"))
     end
@@ -73,13 +73,13 @@ end
 
 # Returns a swap sequence [(idx1, idx2), ...] to turn A into B
 # Not necessarily the optimal swap sequence
-function get_swap_sequence(A::String, B::String)
+function get_swap_sequence(A::Array{String,1}, B::Array{String,1})
     if length(A) != length(B)
         throw(ErrorException("Length of A and B must be the same"))
     end
 
-    localA = Array{Char,1}(undef,0)
-    localB = Array{Char,1}(undef,0)
+    localA = Array{String,1}(undef,0)
+    localB = Array{String,1}(undef,0)
     for i in 1:length(A)
         push!(localA, A[i])
         push!(localB, B[i])
@@ -90,12 +90,11 @@ function get_swap_sequence(A::String, B::String)
     swap_sequence = []
 
     for i in 1:length(A)
-        @printf("Checking index %d\n", i)
-        @printf("localA: %s\nlocalB: %s\n", string(localA), string(localB))
+        @printf("Checking index %d, localA: %s\nlocalB: %s\n", i, string(localA), string(localB))
         if localA[i] != localB[i]
 
             # check where A[i] is in B[i:end]
-            b_indexes = indexin(localA[i], localB[i:end])
+            b_indexes = indexin([localA[i]], localB[i:end])
             @assert(length(b_indexes) == 1)
             b_index = b_indexes[1]
             if b_index === nothing
@@ -120,7 +119,7 @@ function get_swap_sequence(A::String, B::String)
 end
 
 # Calculates a new "velocity" for the particle given global best particle, local best particle
-function pso_particle_velocity(particle, global_best::String, local_best::String, alpha::Float64, beta::Float64)
+function pso_particle_velocity(particle::Array{String,1}, global_best::Array{String,1}, local_best::Array{String,1}, alpha::Float64, beta::Float64)
     swaps_to_local_best = get_swap_sequence(particle, local_best)
     swaps_to_global_best = get_swap_sequence(particle, global_best)
     r = Random.rand()
@@ -135,7 +134,8 @@ function pso_particle_velocity(particle, global_best::String, local_best::String
 end
 
 
-function apply_velocity_to_particle(particle::String, swap_sequence_velocity::Array)::String
+function apply_velocity_to_particle(particle_in::Array{String,1}, swap_sequence_velocity::Array)::Array{String,1}
+    particle = deepcopy(particle_in)
     for (idxA, idxB) in swap_sequence_velocity
         temp = particle[idxA]
         particle[idxA] = particle[idxB]
@@ -150,13 +150,13 @@ function get_new_gap_indexes(old::String, new::String)::Array{Int64,1}
     indexes = []
     for i in 1:length(new)
         if (new[i] == '-' && i == (length(old_local) + 1)) || new[i] == '-' && old_local[i] != '-'
-            @printf("get_new_gap_indexes, new gap at %d, old: %s, new: %s\n", i, old_local, new)
+            #@printf("get_new_gap_indexes, new gap at %d, old: %s, new: %s\n", i, old_local, new)
             push!(indexes, i)
             old_local = string(string(old_local[1:i-1], '-'), old_local[i:end])
         elseif new[i] == old_local[i]
             continue
         else
-            @printf("Sequences were not the same: %s, %s\n", old, new)
+            #@printf("Sequences were not the same: %s, %s\n", old, new)
             throw(ErrorException("Sequences ignoring gaps were not the same"))
         end
     end
@@ -172,9 +172,9 @@ function insert_gaps_at(sequences::Array, seq_indexes::Array{Int64,1}, gap_index
 
         for i in gap_indexes
             # insert a '-' character at index i
-            @printf("Inserting gap into %s at index %d\n", s, i)
+            #@printf("Inserting gap into %s at index %d\n", s, i)
             s = string(string(s[1:i-1], '-'), s[i:end])
-            @printf("New value: %s\n", s)
+            #@printf("New value: %s\n", s)
         end
         # put the modified string back in the array
         sequences[seq_index] = s
@@ -229,7 +229,13 @@ function score_sequences(A::Array)::Int64
 end
 
 
-function progressive_alignment_inorder(sequences::Array, edges::Array{Tuple,1})
+function sequence_equals_ignore_gaps(A::String, B::String)
+    A = filter(x -> x != '-', A)
+    B = filter(x -> x != '-', B)
+    return A == B
+end
+
+function progressive_alignment_inorder(sequences::Array, edges::Array{Tuple,1})::Array{String,1}
     if length(edges) != length(sequences) - 1
         msg = @sprintf("Expected %d edge weights, got %d", length(sequences) - 1, length(edges))
         throw(ErrorException(msg))
@@ -237,7 +243,7 @@ function progressive_alignment_inorder(sequences::Array, edges::Array{Tuple,1})
     local_edges = deepcopy(edges)
     total_score = 0
 
-    aligned_sequences = []
+    aligned_sequences = Array{String,1}(undef,0)
     predecessors = Array{Array{Int64,1}}(undef,0) # store which sequence indexes are at or below each other sequence in the tree
 
     sets = Array{Array{Int64,1},1}(undef,0)
@@ -264,29 +270,19 @@ function progressive_alignment_inorder(sequences::Array, edges::Array{Tuple,1})
         end
         deleteat!(local_edges, min_edge_i)
 
-        # min_edge_weight = min(local_edge_weights...)
-        # min_edge_i = Nothing
-        # for orig_i in 1:length(edge_weights)
-        #     if edge_weights[orig_i] == min_edge_weight
-        #         min_edge_i = orig_i
-        #         break
-        #     end
-        # end
-        # edge_weight = edge_weights[min_edge_i]
-
-
-        # #delete!(local_edge_weights, min_edge_weight)
-        # deleteat!(local_edge_weights, findfirst(x -> x == min_edge_weight, local_edge_weights))
-
-        #min_i += (i - 1)
-
         @printf("aligned_sequences: %s\n", string(aligned_sequences))
         @printf("original edges: %s\n", string(edges))
-        @printf("local_edges: %s\n", string(local_edges))
+        #@printf("local_edges: %s\n", string(local_edges))
+        @printf("min_edge: %s\n", string(min_edge))
 
         # do the alignment of min_i and (min_i + 1)
-        idxA = findfirst(s -> s == min_edge[1], sequences)
-        idxB = findfirst(s -> s == min_edge[2], sequences)
+        # TODO use aligned sequences here instead of original sequences
+        @printf("Looking for %s in %s\n", min_edge[1], sequences)
+        idxA = findfirst(s -> sequence_equals_ignore_gaps(s, min_edge[1]), sequences)
+        #idxA = findfirst(s -> s == min_edge[1], sequences)
+        @printf("Looking for %s in %s\n", min_edge[2], sequences)
+        idxB = findfirst(s -> sequence_equals_ignore_gaps(s, min_edge[2]), sequences)
+        #idxB = findfirst(s -> s == min_edge[2], sequences)
         A = aligned_sequences[idxA]
         B = aligned_sequences[idxB]
         @printf("\n\nPerforming global alignment of %s and %s, edge_weight: %d\n", A, B, min_edge[3])
@@ -298,7 +294,7 @@ function progressive_alignment_inorder(sequences::Array, edges::Array{Tuple,1})
         # TODO take new_gap_indexes_A, and insert same gaps into all current
         # predecessors of A.  And same for B
         new_gap_indexes_A = get_new_gap_indexes(A, alignedA)
-        @printf("new_gap_indexes_A: %s\n", string(new_gap_indexes_A))
+        #@printf("new_gap_indexes_A: %s\n", string(new_gap_indexes_A))
         @printf("predecessors A(%d): %s\n", idxA, string(sets[idxA]))
         seqs_to_update = copy(sets[idxA])
         deleteat!(seqs_to_update, findfirst(x -> x == idxA, seqs_to_update))
@@ -306,7 +302,7 @@ function progressive_alignment_inorder(sequences::Array, edges::Array{Tuple,1})
         @printf("predecessors A(%d): %s\n", idxA, string(sets[idxA]))
 
         new_gap_indexes_B = get_new_gap_indexes(B, alignedB)
-        @printf("new_gap_indexes_B: %s\n", string(new_gap_indexes_B))
+        #@printf("new_gap_indexes_B: %s\n", string(new_gap_indexes_B))
         @printf("predecessors B(%d): %s\n", idxB, string(sets[idxB]))
         seqs_to_update = copy(sets[idxB])
         deleteat!(seqs_to_update, findfirst(x -> x == idxB, seqs_to_update))
@@ -334,12 +330,17 @@ function progressive_alignment_inorder(sequences::Array, edges::Array{Tuple,1})
     return aligned_sequences
 end
 
+# Return the (edge, index)
 function get_edge_between(nodeA::String, nodeB::String, edges::Array)
-    for edge in edges
+    nodeA = filter(x -> x != '-', nodeA)
+    nodeB = filter(x -> x != '-', nodeB)
+
+    for idx in 1:length(edges)
+        edge = edges[idx]
         if edge[1] == nodeA && edge[2] == nodeB
-            return edge
+            return (edge, idx)
         elseif edge[1] == nodeB && edge[2] == nodeA
-            return edge
+            return (edge, idx)
         end
     end
     return nothing
@@ -361,7 +362,7 @@ function PSO_MSA()
     sequences = generate_sequences(t, N)
     println(sequences)
 
-    nodes = []
+    nodes = Array{String,1}(undef,0)
     for i in 1:length(sequences)
         push!(nodes, sequences[i])
     end
@@ -404,11 +405,13 @@ function PSO_MSA()
         push!(particle_scores, score)
     end
 
-
+    # keep track of the local best score+ordering for each particle
     local_best_scores = copy(particle_scores)
     local_best_particles = deepcopy(particles)
+    # keep track of the global best particle
     global_best_particle_idx = argmax(particle_scores)
-    global_best_particle_score = local_best_particles[global_best_particle_idx]
+    global_best_particle_value = copy(local_best_particles[global_best_particle_idx])
+    global_best_particle_score = local_best_scores[global_best_particle_idx]
 
     position_xid = copy(particles[1]) # just start from one
 
@@ -416,7 +419,7 @@ function PSO_MSA()
         # filter list of particles to those only in same position as xid
         filtered_indexes = []
         for pidx in 1:length(particles)
-            if particles[pidx] == position_xid
+            if array_equals_ordered(particles[pidx], position_xid)
                 push!(filtered_indexes, pidx)
             end
         end
@@ -425,12 +428,16 @@ function PSO_MSA()
             continue
         end
 
-        new_velocity = pso_particle_velocity(position_xid, particles[global_best_particle_idx], )
+        new_velocity = pso_particle_velocity(
+                position_xid,
+                local_best_particles[global_best_particle_idx],
+                local_best_particles[filtered_indexes[1]],
+                alpha, beta)
 
         # get the edges between the sequences in the position_xid TSP order
         particle_edges = Array{Tuple,1}(undef,0)
         for i in 2:length(position_xid)
-            edge = get_edge_between(position_xid[i-1], position_xid[i], edges)
+            edge, edge_index = get_edge_between(position_xid[i-1], position_xid[i], edges)
             push!(particle_edges, edge) # push the edge
         end
 
@@ -439,7 +446,7 @@ function PSO_MSA()
         score = score_sequences(aligned_sequences)
 
         # apply the velocity to the TSP order
-        position_xid = apply_velocity_to_particle(position_xid, new_velocity)
+        position_xid = apply_velocity_to_particle(aligned_sequences, new_velocity)
 
         # TODO for all filtered idxs
         for fidx in filtered_indexes
@@ -456,18 +463,16 @@ function PSO_MSA()
                     position_xid, score, global_best_particle_score)
             global_best_particle_score = score
             global_best_particle_idx = filtered_indexes[1]
+            global_best_particle_value = copy(position_xid)
         end
+    end
 
 
-
-
-
-
-
-
-
-
-
+    # print the final results
+    println("Global best:")
+    for seq in global_best_particle_value
+        println(seq)
+    end
 
 
 
