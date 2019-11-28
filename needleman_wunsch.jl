@@ -3,6 +3,8 @@
 # TODO for mismatch_penalty, accept a matrix like BLOSUM62 for scoring the
 # mismatch, instead of a static value
 
+
+
 function global_align(v,w,match_penalty=1,mismatch_penalty=-1,deletion_penalty=-1)
     n1=length(v)
     n2=length(w)
