@@ -529,6 +529,7 @@ function PSO_MSA(sequences::Array{String,1}, iterations::Int)
             #     dprintf("  ")
             #     dprintf("%s\n", seq)
             # end
+            new_velocity = nothing
 
             if do_random_subgroup_move
                 random_subgroup_prob = 0.1
@@ -541,7 +542,8 @@ function PSO_MSA(sequences::Array{String,1}, iterations::Int)
                         particle.best_sequences,
                         alpha, beta)
                 end
-            else
+            end
+            if new_velocity === nothing
                 new_velocity = pso_particle_velocity(
                     particle.position,
                     global_best_particle.best_sequences,
@@ -670,7 +672,7 @@ end
 
 function main()
     t = 5 # number of sequences
-    N = 10
+    N = 15
     sequences = generate_sequences(t, N)
     println(sequences)
     perf = @timed PSO_MSA(sequences, 200)
