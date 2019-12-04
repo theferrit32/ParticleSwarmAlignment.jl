@@ -2,22 +2,19 @@
 
 # TODO for mismatch_penalty, accept a matrix like BLOSUM62 for scoring the
 # mismatch, instead of a static value
-
-
-
-function global_align(v,w,match_penalty=1,mismatch_penalty=-1,deletion_penalty=-1)
-    n1=length(v)
-    n2=length(w)
-    s = zeros(Float64,n1+1,n2+1)
-    b = zeros(Float64,n1+1,n2+1)
+function global_align(v, w, match_penalty=1, mismatch_penalty=-0.5, deletion_penalty=-2)
+    n1 = length(v)
+    n2 = length(w)
+    s = zeros(Float64, n1+1, n2+1)
+    b = zeros(Float64, n1+1, n2+1)
 
     for i in 1:(n1+1)
-        s[i,1]=(i-1)*deletion_penalty
-        b[i,1]=2
+        s[i,1] = (i-1)*deletion_penalty
+        b[i,1] = 2
     end
     for j in 1:(n2+1)
-        s[1,j]=(j-1)*deletion_penalty
-        b[1,j]=3
+        s[1,j] = (j-1)*deletion_penalty
+        b[1,j] = 3
     end
 
     for i in 2:(n1+1)
@@ -42,25 +39,25 @@ function global_align(v,w,match_penalty=1,mismatch_penalty=-1,deletion_penalty=-
         end
     end
 
-    i=n1+1
-    j=n2+1
-    sv=[]
-    sw=[]
+    i = n1+1
+    j = n2+1
+    sv = []
+    sw = []
     while(i>1 || j>1)
         p = b[i,j]
-        if (p==1)
+        if (p == 1)
+            i = i-1
+            j = j-1
+            push!(sv, v[i])
+            push!(sw, w[j])
+        elseif p == 2
             i=i-1
-            j=j-1
-            push!(sv,v[i])
-            push!(sw,w[j])
-        elseif p==2
-            i=i-1
-            push!(sv,v[i])
-            push!(sw,"-")
-        elseif p==3
-            j=j-1
-            push!(sv,"-")
-            push!(sw,w[j])
+            push!(sv, v[i])
+            push!(sw, "-")
+        elseif p == 3
+            j = j-1
+            push!(sv, "-")
+            push!(sw, w[j])
         else
             break
         end
