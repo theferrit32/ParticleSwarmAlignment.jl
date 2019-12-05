@@ -111,7 +111,7 @@ def mem_plots_total():
         yerr=python_total_ivls,
         label="Total Memory Allocated (Python)",
         color=color2,
-        ecolor='red')
+        ecolor=ecolor1)
 
     ax.set_xlabel("Input Sequence Lengths")
     ax.set_ylabel("Memory (KiB)")
@@ -133,7 +133,7 @@ def mem_plots_max():
         yerr=julia_max_ivls,
         label="Maximum Process Memory Footprint (Julia)",
         color=color1,
-        ecolor='red')
+        ecolor=ecolor1)
 
     python_x_vals, python_y_totals, python_total_ivls, python_y_maxes, python_max_ivls = load_mem_file("python-mem.txt")
     #ax.plot(python_x_vals, python_y_maxes, label="Maximum Process Memory Footprint (Python)")
@@ -141,7 +141,7 @@ def mem_plots_max():
         yerr=python_max_ivls,
         label="Maximum Process Memory Footprint (Python)",
         color=color2,
-        ecolor='red')
+        ecolor=ecolor1)
 
     ax.set_xlabel("Input Sequence Lengths")
     ax.set_ylabel("Memory (KiB)")
