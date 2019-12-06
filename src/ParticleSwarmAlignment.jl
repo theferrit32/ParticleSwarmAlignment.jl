@@ -496,7 +496,7 @@ function PSO_MSA(sequences::Array{String,1}, iterations::Int, num_particles::Int
             num_particles = t
         end
     end
-    @printf("num_particles: %d\n", num_particles)
+    @printf("Number of Particles: %d\n", num_particles)
     search_space = num_particles * iterations
     search_solution_ratio = search_space / solution_space
 
