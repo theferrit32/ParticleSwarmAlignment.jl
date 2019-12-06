@@ -2,3 +2,6 @@ name = "ParticleSwarmAlignment"
 uuid = "8d94c4a9-062d-46e8-8fca-d6152af03538"
 authors = ["Kyle Ferriter <kylerferriter@gmail.com>"]
 version = "0.1.0"
+
+[deps]
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
