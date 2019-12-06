@@ -8,7 +8,7 @@ def argmax(l):
             midx = i
     return midx
 
-def global_align(v, w, match_penalty=1, mismatch_penalty=-0.5, deletion_penalty=-2):
+def global_align(v, w, match_penalty=1, mismatch_penalty=-1, deletion_penalty=-1):
     #print("global_align, v = %s, w = %s" % (v, w))
     vlen = len(v)
     wlen = len(w)

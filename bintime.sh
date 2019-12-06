@@ -2,25 +2,21 @@
 # This script uses /usr/bin/time to obtain the max-resident memory for each process
 set -e -x
 
-# NOTE memory values are kilobytes
-# We vary the length of the input sequences between 20 and 500
+# NOTE /usr/bin/time memory values are kilobytes
+# Vary the length of the input sequences between 20 and 500
 # syntax for range: seq first increment last
+
 # Number of sequences to align
 num_sequences=5
 # Number of particle swarm iterations
 iterations=3
 # Number of tests to perform for each parameter value
-test_iters=5
+test_iters=10
 
-# run python test
+run python test
 rm -f python-mem.txt python-time.txt python-output.txt
-for length in `seq 20 20 400`; do
-    time_counter=0
-    internal_bytes_counter=0
-    max_res_counter=0
-
+for length in `seq 20 20 100`; do
     for i in `seq 1 $test_iters`; do
-        echo "LENGTH $length"
         start=$(date +%s.%N)
         output=$(/usr/bin/time -f "%M" python py/main.py $num_sequences $length $iterations 2>&1)
         end=$(date +%s.%N)
@@ -31,28 +27,14 @@ for length in `seq 20 20 400`; do
         max_res=$(echo "$output" | tail -n 1)
         printf "$length $internal_bytes $max_res\n" >> python-mem.txt
         printf "$length $duration\n" >> python-time.txt
-
-        # time_counter=$(echo "$time_counter + $duration" | bc -l)
-        # internal_bytes_counter=$(echo "$internal_bytes_counter + $internal_bytes" | bc -l)
-        # max_res_counter=$(echo "$max_res_counter + $max_res" | bc -l)
     done
-    # avg_time=$(echo "$time_counter / $iters" | bc -l)
-    # avg_internal_bytes=$(echo "$internal_bytes_counter / $iters" | bc -l)
-    # avg_max_res=$(echo "$max_res_counter / $iters" | bc -l)
-    # printf "$length $avg_internal_bytes $avg_max_res\n" >> python-mem.txt
-    # printf "$length $avg_time\n" >> python-time.txt
 done
 
 
 # run julia test
 rm -f julia-mem.txt julia-time.txt julia-output.txt
-for length in `seq 20 20 400`; do
-    time_counter=0
-    internal_bytes_counter=0
-    max_res_counter=0
-
+for length in `seq 20 20 100`; do
     for i in `seq 1 $test_iters`; do
-        echo "LENGTH $length"
         start=$(date +%s.%N)
         output=$(/usr/bin/time -f "%M" julia main.jl $num_sequences $length $iterations 2>&1)
         end=$(date +%s.%N)
@@ -63,14 +45,5 @@ for length in `seq 20 20 400`; do
         max_res=$(echo "$output" | tail -n 1)
         printf "$length $internal_bytes $max_res\n" >> julia-mem.txt
         printf "$length $duration\n" >> julia-time.txt
-
-        # time_counter=$(echo "$time_counter + $duration" | bc -l)
-        # internal_bytes_counter=$(echo "$internal_bytes_counter + $internal_bytes" | bc -l)
-        # max_res_counter=$(echo "$max_res_counter + $max_res" | bc -l)
     done
-    # avg_time=$(echo "$time_counter / $iters" | bc -l)
-    # avg_internal_bytes=$(echo "$internal_bytes_counter / $iters" | bc -l)
-    # avg_max_res=$(echo "$max_res_counter / $iters" | bc -l)
-    # printf "$length $avg_internal_bytes $avg_max_res\n" >> julia-mem.txt
-    # printf "$length $avg_time\n" >> julia-time.txt
 done

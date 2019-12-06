@@ -3,12 +3,13 @@ import time
 import math
 import copy
 import datetime
-
+#import memory_profiler
 # local import
 from align import global_align
 
 random.seed(1)
 debug = False
+do_tracemalloc = True
 
 def dprintf(s, *args):
     if debug:
@@ -61,13 +62,11 @@ def generate_sequences(t:int, l:int) -> list:
     # l is the length of the sequences
     DNA = []
     base_arr = ["A", "T", "G", "C"]
-
     for t_index in range(0, t):
         DNA.append("")
         for _ in range(0, l):
             r = int(math.floor(random.random() * 4))
             DNA[t_index] = DNA[t_index] + base_arr[r]
-
     return DNA
 
 
@@ -234,9 +233,9 @@ def get_new_gap_indexes2(old:str, new:str) -> list:
     indexes = []
     old_i = 0
     new_i = 0
-    while new_i <= len(new):
+    while new_i <= len(new)-1:
         # if new string had a gap either matched with an old non-gap, or past the end of the old string
-        if (new[new_i] == '-' and (old_i > len(old) or old[old_i] != '-')):
+        if (new[new_i] == '-' and (old_i >= len(old) or old[old_i] != '-')):
             # new gap
             #push!(indexes, new_i)
             indexes.append(new_i)
@@ -307,11 +306,7 @@ def progressive_alignment_inorder(sequences:list, edges:list) -> list:
         dprintf("min_edge: %s\n", str(min_edge))
 
         # use aligned sequences here instead of original sequences
-        #idxA = findfirst(s -> sequence_equals_ignore_gaps(s, min_edge[1]), sequences)
-        #idxA = findfirst(s -> s == min_edge[1], sequences)
         idxA = sequences.index(min_edge[0])
-        #idxB = findfirst(s -> sequence_equals_ignore_gaps(s, min_edge[2]), sequences)
-        #idxB = findfirst(s -> s == min_edge[2], sequences)
         idxB = sequences.index(min_edge[1])
         if idxA is None or idxB is None:
             raise RuntimeError("idxA = %s, idxB = %s" % (idxA, idxB))
@@ -323,11 +318,11 @@ def progressive_alignment_inorder(sequences:list, edges:list) -> list:
 
         # take new_gap_indexes_A, and insert same gaps into all current
         # predecessors of A.  And same for B
-        new_gap_indexes_A = get_new_gap_indexes(A, alignedA)
+        new_gap_indexes_A = get_new_gap_indexes2(A, alignedA)
         seqs_to_update = [x for x in sets[idxA] if x != idxA]
         insert_gaps_at(aligned_sequences, seqs_to_update, new_gap_indexes_A)
 
-        new_gap_indexes_B = get_new_gap_indexes(B, alignedB)
+        new_gap_indexes_B = get_new_gap_indexes2(B, alignedB)
         seqs_to_update = [x for x in sets[idxB] if x != idxB]
         insert_gaps_at(aligned_sequences, seqs_to_update, new_gap_indexes_B)
 
@@ -428,7 +423,7 @@ def PSO_MSA(sequences:list, iterations:int):
     if t > 10:
         num_particles = 100
     else:
-        num_particles = t*(t-1) # num edges
+        num_particles = t # num edges
 
     print("num_particles: %d" % num_particles)
     search_space = num_particles * iterations
@@ -453,10 +448,14 @@ def PSO_MSA(sequences:list, iterations:int):
 
         p_edges = []
         for sidx in range(1, len(sequences)):
-            seqA = sequences[sidx-1]
-            seqB = sequences[sidx]
+            seqA_orig = sequences[sidx-1]
+            seqB_orig = sequences[sidx]
+            if len(seqA_orig) != len(seqB_orig):
+                _, seqA, seqB = global_align(seqA_orig, seqB_orig)
+            else:
+                seqA, seqB = seqA_orig, seqB_orig
             scoreAB = score_sequences([seqA, seqB])
-            p_edges.append((seqA, seqB, scoreAB))
+            p_edges.append((seqA_orig, seqB_orig, scoreAB))
 
         aligned_sequences = progressive_alignment_inorder(sequences, p_edges)
         initial_best_score = score_sequences(aligned_sequences)
@@ -487,7 +486,7 @@ def PSO_MSA(sequences:list, iterations:int):
     #best_score = max(local_best_scores)
     global_best_particle = particles[argmax(local_best_scores)]
     print("Initial Best")
-    print("Global best (score = %d, pidx = %d):\n" % (global_best_particle.best_score, global_best_particle.pidx))
+    print("Global best (score = %d, pidx = %d):" % (global_best_particle.best_score, global_best_particle.pidx))
     for seq in global_best_particle.sequences:
         print(seq)
 
@@ -497,10 +496,11 @@ def PSO_MSA(sequences:list, iterations:int):
 
     random_subgroup_move_max = 10
     random_subgroup_move_count = 0
-    random_subgroup_prob = 0.1
+    random_subgroup_prob = -1
 
     # Percentage of particles which if they don't move, move them randomly
-    reshuffle_threshold = len(particles) * 0.75
+    #reshuffle_threshold = len(particles) * 0.75
+    reshuffle_threshold = 1
 
     for iteration in range(iterations):
         # Revert all particle aligned sequences to their original unaligned values
@@ -559,10 +559,14 @@ def PSO_MSA(sequences:list, iterations:int):
                 # Calculate the new edges for the current position (sequence ordering)
                 p_edges = [None] * (len(particle.position)-1)
                 for sidx in range(1, len(particle.position)):
-                    seqA = particle.position[sidx-1]
-                    seqB = particle.position[sidx]
+                    seqA_orig = particle.position[sidx-1]
+                    seqB_orig = particle.position[sidx]
+                    if len(seqA_orig) != len(seqB_orig):
+                        _, seqA, seqB = global_align(seqA_orig, seqB_orig)
+                    else:
+                        seqA, seqB = seqA_orig, seqB_orig
                     scoreAB = score_sequences([seqA, seqB])
-                    p_edges[sidx-1] = (seqA, seqB, scoreAB)
+                    p_edges[sidx-1] = (seqA_orig, seqB_orig, scoreAB)
 
                 particle.edges = p_edges
 
@@ -611,7 +615,7 @@ def PSO_MSA(sequences:list, iterations:int):
     print("FINISHED PARTICLE SWARM")
 
     # print the final results
-    print("\nGlobal best (score = %d, pidx = %d):\n" % (
+    print("\nGlobal best (score = %d, pidx = %d):" % (
         global_best_particle.best_score,
         global_best_particle.pidx))
     for seq in global_best_particle.aligned_sequences:
@@ -620,13 +624,44 @@ def PSO_MSA(sequences:list, iterations:int):
 
     return global_best_particle.best_score
 
-def main():
-    t = 5 # number of sequences
-    N = 38
+def main(args=[]):
+    #import gc
+    #gc.disable()
+    if len(args) > 0:
+        if len(args) != 3:
+            raise RuntimeError("If args are provided there must be 3 of them")
+        t = int(args[0])
+        N = int(args[1])
+        iterations = int(args[2])
+    else:
+        print("Using defaults")
+        # defaults
+        t = 5
+        N = 38
+        iterations = 200
+
     sequences = generate_sequences(t, N)
     print(sequences)
-    perf = PSO_MSA(sequences, 200)
-    #perf = @timed PSO_MSA(sequences, 200)
-    #println(perf)
 
-main()
+    total_bytes = 0
+    if do_tracemalloc:
+        import tracemalloc
+        tracemalloc.start(178956969) # magic number, the max
+
+    times = PSO_MSA(sequences, iterations)
+
+    if do_tracemalloc:
+        snapshot = tracemalloc.take_snapshot()
+        tracemalloc.stop()
+        stats = snapshot.statistics('lineno', cumulative=True)
+        for stat in stats:
+           #print(stat)
+           total_bytes += stat.size
+    print("Total kilobytes: %d" % (total_bytes))
+
+
+if __name__ == "__main__":
+    import sys
+    args = sys.argv[1:]
+    print("args: %s" % (str(args)))
+    exit(main(args))

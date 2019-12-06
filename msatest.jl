@@ -32,14 +32,14 @@ end
 
 #function for testing with increasing number of input sequences.
 function msatest1()
-    println("TEST msatest3")
+    println("TEST msatest1")
     score_mat = Float64[]
     num_of_inp_seq = Int64[]
     bytes = Float64[]
     time = Float64[]
 
     #Vary the number of input sequences and record reading.
-    for t in 10:10:500
+    for t in 10:20:500
         println("t=", t)
         sequences = generate_sequences(t, 50)
         MSA = @timed PSO_MSA(sequences,20)
@@ -81,7 +81,7 @@ function msatest2()
 
     #Vary the length of input sequences and record reading.
     for N in 20:20:800
-        print("N=", N)
+        println("N=", N)
         sequences = generate_sequences(10, N)
         MSA = @timed PSO_MSA(sequences, 20)
         push!(score_mat, MSA[1])
@@ -113,11 +113,11 @@ function msatest3()
     itr = Int64[]
     bytes = Float64[]
     time = Float64[]
-    sequences = generate_sequences(15, 100)
+    sequences = generate_sequences(10, 50)
 
     #Vary the number of iterations and record reading.
-    for i in 20:20:120
-        print("i=", i)
+    for i in 0:5:120
+        println("i=", i)
         Random.seed!(1)
         MSA = @timed PSO_MSA(sequences,i)
         push!(score_mat,MSA[1])
