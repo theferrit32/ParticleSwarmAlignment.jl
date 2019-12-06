@@ -664,10 +664,10 @@ function PSO_MSA(sequences::Array{String,1}, iterations::Int, num_particles::Int
                 particle.edges = p_edges
 
                 # Perform a progressive alignment of the new position with the new edges
-                println("Performing progressive alignment")
-                @time aligned_sequences = progressive_alignment_inorder(particle.position, particle.edges)
-                println("Scoring sequences")
-                @time score = score_sequences(aligned_sequences)
+                #println("Performing progressive alignment")
+                aligned_sequences = progressive_alignment_inorder(particle.position, particle.edges)
+                #println("Scoring sequences")
+                score = score_sequences(aligned_sequences)
 
                 particle.aligned_sequences = aligned_sequences
 

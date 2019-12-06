@@ -25,6 +25,7 @@ function load_fasta_file(fname)
     return sequences
 end
 
+__precompile__()
 function bigmain()
     # Load single-sequence FASTA files for different species
     files = [
@@ -35,12 +36,12 @@ function bigmain()
         #"fission-yeast.fasta",
         "human.fasta",
         "long-finned-pilot-whale.fasta",
-        "norway-rat.fasta",
-        "pacific-white-sided-dolphin.fasta",
-        "rhesus-monkey.fasta",
-        "tropical-clawed-frog.fasta",
-        "water-buffalo.fasta",
-        "white-tufted-ear-marmoset.fasta"
+        #"norway-rat.fasta",
+        #"pacific-white-sided-dolphin.fasta",
+        #"rhesus-monkey.fasta",
+        #"tropical-clawed-frog.fasta",
+        #"water-buffalo.fasta",
+        #"white-tufted-ear-marmoset.fasta"
     ]
     for i in 1:length(files)
         files[i] = string("../fasta/HBA1/", files[i])
@@ -51,8 +52,18 @@ function bigmain()
         append!(sequences, load_fasta_file(fname))
     end
 
-    iterations = 50
-    PSO_MSA(sequences, iterations)
+    iterations = 20
+    num_particles = 10
+    @time pso_score, pso_aligned = PSO_MSA(sequences, iterations, num_particles)
+
+    println("Performing exhaustive search")
+    @time exhaustive_score, exhaustive_aligned = exhaustive_search(sequences)
+    @printf("BEST EXHAUSTIVE SEQUENCES (score=%d)\n", exhaustive_score)
+    for seq in exhaustive_aligned
+        println(seq)
+    end
+
+    @printf("PSO best score: %d, exhaustive best score: %d\n", pso_score, exhaustive_score)
 end
 
 function smallmain()
@@ -62,6 +73,17 @@ function smallmain()
     score, aligned_sequences = PSO_MSA(sequences, iterations)
 
     println("Performing exhaustive search")
+    best_score_exhaustive, best_aligned_exhaustive = exhaustive_search(sequences)
+    @printf("BEST EXHAUSTIVE SEQUENCES (score=%d)\n", best_score_exhaustive)
+    for seq in best_aligned_exhaustive
+        println(seq)
+    end
+
+    @printf("PSO best score: %d, exhaustive best score: %d\n", score, best_score_exhaustive)
+
+end
+
+function exhaustive_search(sequences, weighted_progressive::Bool=false)
     perms = permutations(sequences)
     total_perms = length(perms)
     best_score = 0
@@ -74,8 +96,13 @@ function smallmain()
         for sidx in 2:length(perm)
             seqA_orig = perm[sidx-1]
             seqB_orig = perm[sidx]
-            align_score, seqA_aligned, seqB_aligned = global_align(seqA_orig, seqB_orig)
-            scoreAB = score_sequences([seqA_aligned, seqB_aligned])
+            if weighted_progressive
+                align_score, seqA_aligned, seqB_aligned = global_align(seqA_orig, seqB_orig)
+                scoreAB = score_sequences([seqA_aligned, seqB_aligned])
+            else
+                # setting the edge weight to will just do the alignment inorder
+                scoreAB = 0
+            end
             p_edges[sidx-1] = (seqA_orig, seqB_orig, scoreAB)
         end
         aligned_sequences = progressive_alignment_inorder(perm, p_edges)
@@ -87,10 +114,7 @@ function smallmain()
         end
         i += 1
     end
-    @printf("BEST SEQUENCES (score=%d)\n", best_score)
-    for seq in best_aligned
-        println(seq)
-    end
+    return best_score, best_aligned
 end
 
 function scoremain()
@@ -111,5 +135,5 @@ function scoremain()
 end
 
 #scoremain()
-#bigmain()
-smallmain()
+bigmain()
+#smallmain()
