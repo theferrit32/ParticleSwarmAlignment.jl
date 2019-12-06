@@ -54,7 +54,7 @@ function bigmain()
 end
 
 function smallmain()
-    filename = "ENA-ebi.fasta"
+    filename = "fasta/ENA-ebi.fasta"
     sequences = load_fasta_file(filename)
     iterations = 50
     PSO_MSA(sequences, iterations)
