@@ -41,7 +41,7 @@ function bigmain()
         "white-tufted-ear-marmoset.fasta"
     ]
     for i in 1:length(files)
-        files[i] = string("fasta/HBA1/", files[i])
+        files[i] = string("../fasta/HBA1/", files[i])
     end
     sequences = String[]
 
@@ -54,7 +54,7 @@ function bigmain()
 end
 
 function smallmain()
-    filename = "fasta/ENA-ebi.fasta"
+    filename = "../fasta/ENA-ebi.fasta"
     sequences = load_fasta_file(filename)
     iterations = 50
     PSO_MSA(sequences, iterations)
@@ -78,5 +78,5 @@ function scoremain()
 end
 
 #scoremain()
-#bigmain()
-smallmain()
+bigmain()
+#smallmain()

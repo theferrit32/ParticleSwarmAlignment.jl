@@ -1,0 +1,4 @@
+name = "ParticleSwarmAlignment"
+uuid = "8d94c4a9-062d-46e8-8fca-d6152af03538"
+authors = ["Kyle Ferriter <kylerferriter@gmail.com>"]
+version = "0.1.0"
