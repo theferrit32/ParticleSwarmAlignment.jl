@@ -1,5 +1,7 @@
-include("./pso_msa.jl")
+include("./ParticleSwarmAlignment.jl")
 using .ParticleSwarmAlignment
+using Combinatorics
+using Printf
 
 function load_fasta_file(fname)
     sequences = String[]
@@ -57,7 +59,38 @@ function smallmain()
     filename = "../fasta/ENA-ebi.fasta"
     sequences = load_fasta_file(filename)
     iterations = 50
-    PSO_MSA(sequences, iterations)
+    score, aligned_sequences = PSO_MSA(sequences, iterations)
+
+    println("Performing exhaustive search")
+    perms = permutations(sequences)
+    total_perms = length(perms)
+    best_score = 0
+    best_perm = String[]
+    best_aligned = String[]
+    i = 1
+    for perm in perms
+        @printf("Exhaustive Search step %d/%d\n", i, total_perms)
+        p_edges = Array{Tuple{String,String,Int},1}(undef,length(perm)-1)
+        for sidx in 2:length(perm)
+            seqA_orig = perm[sidx-1]
+            seqB_orig = perm[sidx]
+            align_score, seqA_aligned, seqB_aligned = global_align(seqA_orig, seqB_orig)
+            scoreAB = score_sequences([seqA_aligned, seqB_aligned])
+            p_edges[sidx-1] = (seqA_orig, seqB_orig, scoreAB)
+        end
+        aligned_sequences = progressive_alignment_inorder(perm, p_edges)
+        score = score_sequences(aligned_sequences)
+        if score > best_score
+            best_score = score
+            best_perm = copy(perm)
+            best_aligned = copy(aligned_sequences)
+        end
+        i += 1
+    end
+    @printf("BEST SEQUENCES (score=%d)\n", best_score)
+    for seq in best_aligned
+        println(seq)
+    end
 end
 
 function scoremain()
@@ -78,5 +111,5 @@ function scoremain()
 end
 
 #scoremain()
-bigmain()
-#smallmain()
+#bigmain()
+smallmain()

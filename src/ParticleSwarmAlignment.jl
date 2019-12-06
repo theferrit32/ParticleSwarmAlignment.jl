@@ -1,6 +1,6 @@
 module ParticleSwarmAlignment
 
-export PSO_MSA, score_sequences, generate_sequences
+export PSO_MSA, score_sequences, generate_sequences, global_align, progressive_alignment_inorder
 
 using Random
 using Printf
@@ -725,7 +725,7 @@ function PSO_MSA(sequences::Array{String,1}, iterations::Int, num_particles::Int
     end
     println()
 
-    return global_best_particle.best_score
+    return global_best_particle.best_score, global_best_particle.aligned_sequences
 end
 
 end # end module
