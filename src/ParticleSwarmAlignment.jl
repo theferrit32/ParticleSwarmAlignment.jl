@@ -6,10 +6,12 @@ using Random
 using Printf
 using Dates
 
+# Random module must be seeded with a constant in order to have
+# reproducible test results
 Random.seed!(1)
 
+# Debug printf function which can be turned on/off with debug flag
 debug = false
-
 if debug
     function dprintf(s::String, args...)
         @eval @printf($s, $(args...))
@@ -20,8 +22,9 @@ else
     end
 end
 
-# Needleman-Wunsch Global Alignment
-# TODO: Add keyword arguments for optional preallocated s, b matrices
+# Needleman-Wunsch Global Alignment using fixed penalties.
+# Extending with keyword arguments for optional preallocated s, b matrices
+# will drastically improve performance during its use in progressive alignment
 function global_align(v, w, match_penalty=1, mismatch_penalty=-1, deletion_penalty=-1)
     n1 = length(v)
     n2 = length(w)
@@ -88,6 +91,8 @@ function global_align(v, w, match_penalty=1, mismatch_penalty=-1, deletion_penal
     return (s[n1+1,n2+1], join(reverse(sv)), join(reverse(sw)))
 end
 
+
+# Generates t sequences all of length l, and returns an array of strings
 function generate_sequences(t::Int64, l::Int64)
     # t is the number of sequences to create
     # l is the length of the sequences
@@ -105,6 +110,7 @@ function generate_sequences(t::Int64, l::Int64)
 end
 
 
+# Performs an *ordered* equals comparison of two ordered arrays
 function array_equals_ordered(A::Array, B::Array)
     if length(A) != length(B)
         return false
@@ -118,6 +124,8 @@ function array_equals_ordered(A::Array, B::Array)
     return true
 end
 
+# Determines whether Any element e is contained within Any array A.
+# Returns true if so.
 function array_contains(A::Array, e)
     for i in 1:length(A)
         if array_equals_ordered(A[i], e)
@@ -127,6 +135,11 @@ function array_contains(A::Array, e)
     return false
 end
 
+
+# Creates num random permutations of the elements of A. If must_be_unique is left
+# as true, then it ensures that the permutations returned are unique. This can fail
+# if it takes too long to find a unique permutation, as the method randomly searches
+# for permutations instead of iterating through them in order.
 function random_permutations(A::Array{String,1}, num::Int64, must_be_unique::Bool=true)::Array{Array{String,1},1}
     # Return num random permutations of the elements of A
     results = Array{Array{String,1},1}(undef,0)
@@ -154,7 +167,7 @@ function random_permutations(A::Array{String,1}, num::Int64, must_be_unique::Boo
 end
 
 # Returns a swap sequence [(idx1, idx2), ...] to turn A into B
-# Not necessarily the optimal swap sequence
+# Not necessarily the optimal swap sequence, of the least number of swaps
 function get_swap_sequence(A_in::Array{String,1}, B_in::Array{String,1})
     if length(A_in) != length(B_in)
         throw(ErrorException("Length of A and B must be the same"))
@@ -194,7 +207,10 @@ function get_swap_sequence(A_in::Array{String,1}, B_in::Array{String,1})
     return swap_sequence
 end
 
-# Calculates a new "velocity" for the particle given global best particle, local best particle
+
+# Calculates a new "velocity" for the particle position given global best position,
+# and the local best position. Alpha and Beta are tuning parameters which determine
+# how quickly the particle trends towards the local/global best.
 function pso_particle_velocity(particle::Array{String,1}, global_best::Array{String,1}, local_best::Array{String,1}, alpha::Float64, beta::Float64)
     dprintf("current_position: %s\n", string(particle))
     dprintf("local_best: %s\n", string(local_best))
@@ -221,16 +237,21 @@ function pso_particle_velocity(particle::Array{String,1}, global_best::Array{Str
 end
 
 
-function apply_velocity_to_particle(particle_in::Array{String,1}, swap_sequence_velocity::Array)::Array{String,1}
-    particle = deepcopy(particle_in)
+# This takes a particle position, and performs the swaps specified by
+# swap_sequence_velocity, in order. Returns the resulting position array.
+function apply_velocity_to_particle(position_in::Array{String,1}, swap_sequence_velocity::Array)::Array{String,1}
+    position = deepcopy(position_in)
     for (idxA, idxB) in swap_sequence_velocity
-        temp = particle[idxA]
-        particle[idxA] = particle[idxB]
-        particle[idxB] = temp
+        temp = position[idxA]
+        position[idxA] = position[idxB]
+        position[idxB] = temp
     end
-    return particle
+    return position
 end
 
+
+# Determines where gaps need to be inserted into old to obtain the new string value.
+# Returns the indexes.
 function get_new_gap_indexes(old::String, new::String)::Array{Int64,1}
     old_local = old
     indexes = Int[]
@@ -248,6 +269,10 @@ function get_new_gap_indexes(old::String, new::String)::Array{Int64,1}
     return indexes
 end
 
+# Determines where gaps need to be inserted into old to obtain the new string value.
+# Returns the indexes.
+# This is an optimization of get_new_gap_indexes which does incur large memory copies
+# due to string copying.
 function get_new_gap_indexes2(old::String, new::String)::Array{Int64,1}
     indexes = Int[]
     old_i = 1
@@ -269,6 +294,8 @@ function get_new_gap_indexes2(old::String, new::String)::Array{Int64,1}
     return indexes
 end
 
+# Inserts gap characters into the sequences specified by the indexes in seq_indexes.
+# The gaps are inserted at the indexes within each specified sequence at positions gap_indexes.
 function insert_gaps_at(sequences::Array, seq_indexes::Array{Int64,1}, gap_indexes::Array{Int64,1})
     if length(seq_indexes) > 0 && length(gap_indexes) > 0
         gap_indexes = sort(gap_indexes)
@@ -287,6 +314,8 @@ function insert_gaps_at(sequences::Array, seq_indexes::Array{Int64,1}, gap_index
     end
 end
 
+# k is the length of the sequences, t is the number of sequences, and A is the sequences.
+# The sequences of A must be the same length, or k must be the length of the longest sequence.
 function Make_Profile(k::Int, t::Int, A::Array{String,1})::Dict{String,Array{Int64,1}}
     idxA = zeros(Int64, k)
     idxC = zeros(Int64, k)
@@ -322,6 +351,7 @@ function Make_Profile(k::Int, t::Int, A::Array{String,1})::Dict{String,Array{Int
     )
 end
 
+# Score the sequences in A by obtaining the consensus score using Make_Profile
 function score_sequences(A::Array{String,1})::Int
     k = length(A[1])    # how long are the sequences
     t = length(A)       # how many sequences
@@ -338,12 +368,18 @@ function score_sequences(A::Array{String,1})::Int
     return score
 end
 
+# Performs a comparison of A and B, but ignoring the gap characters in each.
 function sequence_equals_ignore_gaps(A::String, B::String)
     A = filter(x -> x != '-', A)
     B = filter(x -> x != '-', B)
     return A == B
 end
 
+
+# This performs a progressive alignment of sequences, using the elements of the edges array
+# to determine the order with which to perform neighbor alignments.
+# The edges array must contain the pairwise edges and weights for all consecutive
+# elements of the sequences array.
 function progressive_alignment_inorder(sequences::Array, edges::Array{Tuple{String,String,Int},1})::Array{String,1}
     if length(edges) != length(sequences) - 1
         msg = @sprintf("Expected %d edge weights, got %d", length(sequences) - 1, length(edges))
@@ -408,7 +444,9 @@ function progressive_alignment_inorder(sequences::Array, edges::Array{Tuple{Stri
     return aligned_sequences
 end
 
-# Return the (edge, index)
+
+# Searches the edges array to find the edge between nodeA and nodeB.
+# Returns the edge Tuple{String,String,Int}, as well as the index it was found at.
 function get_edge_between(nodeA::String, nodeB::String, edges::Array)
     #nodeA = filter(x -> x != '-', nodeA)
     #nodeB = filter(x -> x != '-', nodeB)
@@ -423,6 +461,7 @@ function get_edge_between(nodeA::String, nodeB::String, edges::Array)
     return nothing
 end
 
+# Holds all relevant information for a particle in the swarm
 mutable struct Particle
     sequences::Array{String,1}              # initial order/position
     aligned_sequences::Array{String,1}      # hold the aligned sequences to avoid unnecessary recomputes
@@ -433,6 +472,7 @@ mutable struct Particle
     edges::Array{Tuple{String,String,Int},1}# edges for the current position
 end
 
+# Utility function for printing the more relevant information about a particle for debugging.
 function print_particle(p::Particle)
     print("Particle: ")
     println(p.pidx)
@@ -457,6 +497,11 @@ function print_particle(p::Particle)
 end
 
 
+# The primary function of the module, which takes the sequences, the number of swarm iterations to run, and
+# optionally the number of particles to use. If no num_particles is provided, then a reasonable value is
+# calculated based on the number of sequences.
+# The length of the sequences do not all need to be the same, however the performance may reduce if they
+# are not because additional work must be done to initially align neighbors before computing edge weights
 function PSO_MSA(sequences::Array{String,1}, iterations::Int, num_particles::Int=0)
     # Number of sequences
     t = length(sequences)
@@ -506,13 +551,15 @@ function PSO_MSA(sequences::Array{String,1}, iterations::Int, num_particles::Int
             #     seqA, seqB = seqA_orig, seqB_orig
             # end
             # scoreAB = score_sequences([seqA, seqB])
+
+            # Here the initial score for each neighbor distance is set to zero
+            # to avoid having to align them to obtain a valid distance score
             scoreAB = 0
             push!(p_edges, (seqA_orig, seqB_orig, scoreAB))
         end
 
         @time aligned_sequences = progressive_alignment_inorder(sequences, p_edges)
 
-        #aligned_sequences = progressive_alignment_inorder(sequences, p_edges)
         initial_best_score = score_sequences(aligned_sequences)
         p = Particle(
             permutations[pidx],         # original sequences/position
@@ -530,12 +577,17 @@ function PSO_MSA(sequences::Array{String,1}, iterations::Int, num_particles::Int
 
     #alpha = Random.rand()
     #beta = Random.rand()
+
+    # Here are two important tuning values. These determine how rapidly the particles trend
+    # towards their own past best and the swarm's best solution. With some non-systematic testing
+    # it was determined that 0.2 is a reasonable value for both. Too high of a value results
+    # in particles not searching the area around the local optimum enough. Too low of a value results
+    # in not enough motion happening.
     alpha = 0.2
     beta = 0.2
 
     # keep track of the local best score+ordering for each particle
     local_best_scores = [p.best_score for p in particles]
-    #local_best_particles = deepcopy(particles)
     # keep track of the global best particle
     global_best_particle = particles[argmax(local_best_scores)]
     println("Initial Best")
@@ -545,26 +597,25 @@ function PSO_MSA(sequences::Array{String,1}, iterations::Int, num_particles::Int
     end
     @printf("Initial global best score: %d\n", global_best_particle.best_score)
 
-    # Pick a starting position, arbitrary
-    #position_xid = copy(particles[1].sequences)
-
     iteration_metrics = Millisecond[]
 
+    # These take a potential solution to swarm stagnation. Every so often, we can reassign
+    # a certain number of particles in the swarm to a random position.
+    # Setting random_subgroup_prob to -1 disables this. We have disabled it due to
+    # it introducing too much randomness into the system.
     random_subgroup_move_max = 10
     random_subgroup_move_count = 0
     random_subgroup_prob = -1
 
     # Percentage of particles which if they don't move, move them randomly
-    #reshuffle_threshold = length(particles) * 0.75
+    # This is also a significant tuning value. Setting it to one means that any time a particle
+    # doesn't move for the past iteration, immediately pick it up and give it a new position.
+    #reshuffle_threshold = length(particles) * 0.5
     reshuffle_threshold = 1
 
     for iteration in 1:iterations
-        # Revert all particle aligned sequences to their original unaligned values
-        # for p in particles
-        #     p.aligned_sequences = copy(p.position)
-        # end
 
-        unmoved_particles = []#Int[]
+        unmoved_particles = []
 
         @printf("Beginning iteration %d\n", iteration)
         start = Dates.now()
@@ -579,8 +630,10 @@ function PSO_MSA(sequences::Array{String,1}, iterations::Int, num_particles::Int
 
         for pidx in 1:length(particles)
             particle = particles[pidx]
-            #println("Looking at particle:")
-            #print_particle(particles[pidx])
+            if debug
+                println("Looking at particle:")
+                print_particle(particles[pidx])
+            end
 
             new_velocity = nothing
 
@@ -635,9 +688,7 @@ function PSO_MSA(sequences::Array{String,1}, iterations::Int, num_particles::Int
                 particle.edges = p_edges
 
                 # Perform a progressive alignment of the new position with the new edges
-                #println("Performing progressive alignment")
                 aligned_sequences = progressive_alignment_inorder(particle.position, particle.edges)
-                #println("Scoring sequences")
                 score = score_sequences(aligned_sequences)
 
                 particle.aligned_sequences = aligned_sequences
