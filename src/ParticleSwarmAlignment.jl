@@ -5,8 +5,6 @@ export PSO_MSA, score_sequences, generate_sequences, global_align, progressive_a
 using Random
 using Printf
 using Dates
-#include("./align.jl")
-#include("./score.jl")
 
 Random.seed!(1)
 
@@ -108,7 +106,6 @@ end
 
 
 function array_equals_ordered(A::Array, B::Array)
-    #dprintf("Comparing %s to %s\n", string(A), string(B))
     if length(A) != length(B)
         return false
     end
@@ -162,7 +159,7 @@ function get_swap_sequence(A_in::Array{String,1}, B_in::Array{String,1})
     if length(A_in) != length(B_in)
         throw(ErrorException("Length of A and B must be the same"))
     end
-    #@printf("Getting swaps between:\n%s,\n%s\n", string(A_in), string(B_in))
+    dprintf("Getting swaps between:\n%s,\n%s\n", string(A_in), string(B_in))
     A = Array{String,1}(undef,length(A_in))
     B = Array{String,1}(undef,length(B_in))
     for i in 1:length(A_in)
@@ -173,7 +170,6 @@ function get_swap_sequence(A_in::Array{String,1}, B_in::Array{String,1})
     swap_sequence = Tuple{Int,Int}[]
 
     for i in 1:length(A)
-        #@printf("\nChecking index %d,\nlocalA: %s\nlocalB: %s\n", i, string(A), string(B))
         if A[i] != B[i]
             # We want to turn A into B
             # so find where B[i] is in A[i:end], and swap that element in A with the element at A[i]
@@ -184,7 +180,6 @@ function get_swap_sequence(A_in::Array{String,1}, B_in::Array{String,1})
             end
             a_index += i - 1
 
-            #dprintf("Doing swap in A (%d, %d)\n", i, a_index)
             temp = A[i]
             A[i] = A[a_index]
             A[a_index] = temp
@@ -201,13 +196,13 @@ end
 
 # Calculates a new "velocity" for the particle given global best particle, local best particle
 function pso_particle_velocity(particle::Array{String,1}, global_best::Array{String,1}, local_best::Array{String,1}, alpha::Float64, beta::Float64)
-    #@printf("current_position: %s\n", string(particle))
-    #@printf("local_best: %s\n", string(local_best))
-    #@printf("global_best: %s\n", string(global_best))
+    dprintf("current_position: %s\n", string(particle))
+    dprintf("local_best: %s\n", string(local_best))
+    dprintf("global_best: %s\n", string(global_best))
     swaps_to_local_best = get_swap_sequence(particle, local_best)
     swaps_to_global_best = get_swap_sequence(particle, global_best)
-    #dprintf("swaps_to_global_best: %s\n", swaps_to_global_best)
-    #dprintf("swaps_to_local_best: %s\n", swaps_to_local_best)
+    dprintf("swaps_to_global_best: %s\n", swaps_to_global_best)
+    dprintf("swaps_to_local_best: %s\n", swaps_to_local_best)
     velocity = Tuple{Int,Int}[]
 
     for lswap in swaps_to_local_best
@@ -238,7 +233,6 @@ end
 
 function get_new_gap_indexes(old::String, new::String)::Array{Int64,1}
     old_local = old
-    #old_array = split(old, "")
     indexes = Int[]
     for i in 1:length(new)
         if (new[i] == '-' && i == (length(old_local) + 1)) || new[i] == '-' && old_local[i] != '-'
@@ -285,9 +279,7 @@ function insert_gaps_at(sequences::Array, seq_indexes::Array{Int64,1}, gap_index
 
             for i in gap_indexes
                 # insert a '-' character at index i
-                #@printf("Inserting gap into %s at index %d\n", s, i)
                 s = string(string(s[1:i-1], '-'), s[i:end])
-                #@printf("New value: %s\n", s)
             end
             # put the modified string back in the array
             sequences[seq_index] = s
@@ -341,13 +333,10 @@ function score_sequences(A::Array{String,1})::Int
         t = profile["T"][i]
         g = profile["G"][i]
         c = profile["C"][i]
-
         score += max(a, t, g, c)
-        #score += max(profile["A"][i], profile["T"][i], profile["G"][i], profile["C"][i])
     end
     return score
 end
-
 
 function sequence_equals_ignore_gaps(A::String, B::String)
     A = filter(x -> x != '-', A)
@@ -362,7 +351,6 @@ function progressive_alignment_inorder(sequences::Array, edges::Array{Tuple{Stri
     end
 
     aligned_sequences = Array{String,1}(undef,length(sequences))
-    #predecessors = Array{Array{Int64,1}}(undef,0) # store which sequence indexes are at or below each other sequence in the tree
 
     sets = Array{Array{Int64,1},1}(undef,0)
 
@@ -370,26 +358,13 @@ function progressive_alignment_inorder(sequences::Array, edges::Array{Tuple{Stri
         #seq in sequences
         seq = sequences[i]
         aligned_sequences[i] = seq
-        #push!(aligned_sequences, deepcopy(seq))
-        #push!(predecessors, [])
         push!(sets, [i])
     end
-    #@printf("Sequences: %s\n", string(sequences))
     dprintf("Edges: %s\n", string(edges))
 
     local_edges = sort(edges, by=x -> x[3], rev=true) # sort desc by weight
 
     for i in 1:length(edges)
-        # find the min edge weight that has not been used yet
-        # min_edge = local_edges[1]
-        # min_edge_i = 1
-        # for edge_i in 2:length(local_edges)
-        #     if local_edges[edge_i][3] < min_edge[3]
-        #         min_edge = local_edges[edge_i]
-        #         min_edge_i = edge_i
-        #     end
-        # end
-        # deleteat!(local_edges, min_edge_i)
         min_edge = pop!(local_edges)
 
         dprintf("min_edge: %s\n", string(min_edge))
@@ -653,11 +628,7 @@ function PSO_MSA(sequences::Array{String,1}, iterations::Int, num_particles::Int
                     seqB_orig = particle.position[sidx]
                     seqA_aligned = particle.aligned_sequences[sidx-1]
                     seqB_aligned = particle.aligned_sequences[sidx]
-                    # if length(seqA_orig) != length(seqB_orig)
-                    #     align_score, seqA, seqB = global_align(seqA_orig, seqB_orig)
-                    # else
-                    #     seqA, seqB = seqA_orig, seqB_orig
-                    # end
+
                     scoreAB = score_sequences([seqA_aligned, seqB_aligned])
                     p_edges[sidx-1] = (seqA_orig, seqB_orig, scoreAB)
                 end
@@ -704,20 +675,22 @@ function PSO_MSA(sequences::Array{String,1}, iterations::Int, num_particles::Int
         end_time = Dates.now()
         duration = end_time - start
         push!(iteration_metrics, duration)
-        @printf("\nIteration %d took %d milliseconds\n", iteration, duration.value)
-        # @printf("Global best (score = %d, pidx = %d):\n",
-        #     global_best_particle.best_score,
-        #     global_best_particle.pidx)
-        # for seq in global_best_particle.aligned_sequences
-        #     println(seq)
-        # end
-        # println()
+        @printf("Iteration %d took %d milliseconds\n", iteration, duration.value)
+        if debug
+            @printf("Global best (score = %d, pidx = %d):\n",
+                global_best_particle.best_score,
+                global_best_particle.pidx)
+            for seq in global_best_particle.aligned_sequences
+                println(seq)
+            end
+            println()
+        end
     end
 
     println("FINISHED PARTICLE SWARM")
 
     # print the final results
-    @printf("\nGlobal best (score = %d, pidx = %d):\n",
+    @printf("Global best (score = %d, pidx = %d):\n",
         global_best_particle.best_score,
         global_best_particle.pidx)
     for seq in global_best_particle.aligned_sequences
