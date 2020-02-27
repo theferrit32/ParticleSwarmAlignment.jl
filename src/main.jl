@@ -1,7 +1,7 @@
 
 using Printf
 
-include("./pso_msa.jl")
+include("./ParticleSwarmAlignment.jl")
 
 function main()
     #GC.enable(false)
